@@ -1,5 +1,35 @@
 .DS_Store
 Thumbs.db
 *.log
+
+# Environment files and secrets
 .env
-.env.local
+.env.*
+!.env.example
+
+# Local databases
+*.sqlite
+*.sqlite-*
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+public/build/
+public/hot/
+
+# Local IDE and temporary files
+.vscode/
+.fleet/
+.idea/
+.git-corrupt/
+**/tempCodeRunnerFile.js
+
+# Laravel generated files
+backend/storage/*.key
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*.php

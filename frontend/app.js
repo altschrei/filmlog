@@ -99,9 +99,8 @@ function logApiRequest(logItem) {
   container.innerHTML = state.logs.map(l => `
     <div class="flex items-center justify-between py-1 border-b border-brand-border/40">
       <div class="flex items-center gap-2 overflow-hidden">
-        <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${
-          l.ok ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'
-        }">${l.method}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded font-bold ${l.ok ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'
+    }">${l.method}</span>
         <span class="text-white truncate max-w-xs sm:max-w-md">${l.url}</span>
       </div>
       <div class="flex items-center gap-3 shrink-0">
@@ -134,6 +133,8 @@ function toggleLogsDrawer() {
 // 3. INITIALIZATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+  const authForm = document.getElementById('auth-form');
+  authForm.addEventListener('submit', handleAuthSubmit);
   lucide.createIcons();
   updateApiUrlDisplay();
   renderAuthUI();
@@ -206,7 +207,7 @@ async function loadDiscoverMovies(shuffle = false) {
     const data = await apiFetch('/movies');
     // Normalize response: could be array or { data: [...] }
     state.allMovies = Array.isArray(data) ? data : (data.data || data.movies || []);
-    
+
     if (shuffle) {
       state.allMovies.sort(() => Math.random() - 0.5);
       showToast('Daftar film berhasil diacak (shuffle)!', 'success');
@@ -257,7 +258,7 @@ function filterByGenre(genre) {
 
 function applyMovieFilters() {
   state.filteredMovies = state.allMovies.filter(movie => {
-    const matchesSearch = !state.searchQuery || 
+    const matchesSearch = !state.searchQuery ||
       movie.title.toLowerCase().includes(state.searchQuery) ||
       (movie.director && movie.director.toLowerCase().includes(state.searchQuery));
 
@@ -303,9 +304,8 @@ function renderMovieGrid() {
 
           <!-- Quick Action Buttons Overlay -->
           <div class="poster-overlay absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-200 flex flex-col justify-end p-3 space-y-2">
-            <button onclick="event.stopPropagation(); toggleWatchlist(${movie.id})" class="w-full py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-              isWatchlisted ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-brand-surface/90 hover:bg-brand-green hover:text-black text-white border border-brand-border'
-            }">
+            <button onclick="event.stopPropagation(); toggleWatchlist(${movie.id})" class="w-full py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${isWatchlisted ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-brand-surface/90 hover:bg-brand-green hover:text-black text-white border border-brand-border'
+      }">
               <i data-lucide="${isWatchlisted ? 'check' : 'bookmark'}" class="w-3.5 h-3.5"></i>
               <span>${isWatchlisted ? 'In Watchlist' : 'Add Watchlist'}</span>
             </button>
@@ -332,7 +332,7 @@ function renderMovieGrid() {
 
 function isMovieInWatchlist(movieId) {
   return state.watchlist.some(item => {
-    const id = item.movie_id || item.movieId || item.id || item;
+    const id = item.movie_id || item.movieId || (item.movie && item.movie.id) || item.id || item;
     return String(id) === String(movieId);
   });
 }
@@ -400,9 +400,8 @@ async function openMovieDetail(movieId) {
 
         <!-- Actions -->
         <div class="pt-4 border-t border-brand-border flex items-center gap-3">
-          <button onclick="toggleWatchlist(${movie.id})" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition ${
-            isWatchlisted ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-brand-green text-black hover:brightness-110'
-          }">
+          <button id="detail-watchlist-toggle" onclick="toggleWatchlist(${movie.id})" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition ${isWatchlisted ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-brand-green text-black hover:brightness-110'
+    }">
             <i data-lucide="${isWatchlisted ? 'check' : 'bookmark'}" class="w-4 h-4"></i>
             <span>${isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}</span>
           </button>
@@ -428,6 +427,20 @@ function closeMovieDetailModal() {
   setTimeout(() => modal.classList.add('hidden'), 200);
 }
 
+function updateMovieDetailWatchlistButton(movieId) {
+  const button = document.getElementById('detail-watchlist-toggle');
+  if (!button || !state.activeDetailMovie || String(state.activeDetailMovie.id) !== String(movieId)) return;
+
+  const isWatchlisted = isMovieInWatchlist(movieId);
+  button.className = `flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition ${isWatchlisted ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'bg-brand-green text-black hover:brightness-110'
+    }`;
+  button.innerHTML = `
+    <i data-lucide="${isWatchlisted ? 'check' : 'bookmark'}" class="w-4 h-4"></i>
+    <span>${isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}</span>
+  `;
+  lucide.createIcons();
+}
+
 // ==========================================
 // 7. WATCHLIST LOGIC
 // ==========================================
@@ -437,7 +450,7 @@ async function loadWatchlist() {
   try {
     const data = await apiFetch('/watchlist');
     state.watchlist = Array.isArray(data) ? data : (data.data || data.watchlist || []);
-    
+
     // Update badge count
     const badge = document.getElementById('watchlist-badge');
     const countEl = document.getElementById('watchlist-count');
@@ -467,7 +480,7 @@ async function toggleWatchlist(movieId) {
       // DELETE /api/watchlist/:movieId
       await apiFetch(`/watchlist/${movieId}`, { method: 'DELETE' });
       state.watchlist = state.watchlist.filter(item => {
-        const id = item.movie_id || item.movieId || item.id || item;
+        const id = item.movie_id || item.movieId || (item.movie && item.movie.id) || item.id || item;
         return String(id) !== String(movieId);
       });
       showToast('Film dihapus dari watchlist', 'info');
@@ -484,9 +497,7 @@ async function toggleWatchlist(movieId) {
     // Refresh UI
     applyMovieFilters();
     loadWatchlist();
-    if (state.activeDetailMovie && String(state.activeDetailMovie.id) === String(movieId)) {
-      openMovieDetail(movieId);
-    }
+    updateMovieDetailWatchlistButton(movieId);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -506,7 +517,7 @@ function renderWatchlistGrid() {
   emptyEl.classList.add('hidden');
   gridEl.innerHTML = state.watchlist.map(item => {
     // Watchlist item might be movie object or { movieId: 1, movie: {...} }
-    const movieId = item.movie_id || item.movieId || item.id || item;
+    const movieId = item.movie_id || item.movieId || (item.movie && item.movie.id) || item.id || item;
     const movie = item.movie || state.allMovies.find(m => String(m.id) === String(movieId)) || {
       id: movieId,
       title: item.title || `Movie #${movieId}`,
@@ -637,14 +648,16 @@ async function handleWatchedSubmit(event, movieId) {
         movieId: movieId,
         movie_id: movieId,
         rating: rating,
+        review_text: review,
         review: review,
         opinion: review
       })
     });
 
-    showToast('Catatan film berhasil disimpan! ⭐', 'success');
+    showToast('Film ditandai sudah ditonton dan catatan berhasil disimpan! ⭐', 'success');
     closeMovieDetailModal();
-    loadWatchedList();
+    await Promise.all([loadWatchedList(), loadWatchlist()]);
+    applyMovieFilters();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -688,7 +701,7 @@ function renderWatchedList() {
             </div>
           </div>
           <p class="text-sm text-gray-300 leading-relaxed bg-brand-dark/40 p-3 rounded-xl border border-brand-border/40 font-normal">
-            "${item.review || item.opinion || 'Tidak ada catatan ulasan.'}"
+            "${item.review_text || item.review || item.opinion || 'Tidak ada catatan ulasan.'}"
           </p>
         </div>
       </div>
@@ -713,7 +726,7 @@ async function submitAiRecommendation() {
 
   const btn = document.getElementById('btn-submit-ai');
   const resultContainer = document.getElementById('ai-result-container');
-  
+
   btn.disabled = true;
   btn.innerHTML = `<div class="animate-spin w-4 h-4 border-2 border-black border-t-transparent rounded-full"></div> Analyzing...`;
 
@@ -739,7 +752,7 @@ async function submitAiRecommendation() {
 
 function renderAiRecommendation(data) {
   const container = document.getElementById('ai-result-container');
-  
+
   // Backend might return { movie_id: 1, reasoning: "..." } or full { movie: {...}, reasoning: "..." }
   const movieId = data.movie_id || data.movieId || (data.movie && data.movie.id);
   const matchedMovie = data.movie || state.allMovies.find(m => String(m.id) === String(movieId)) || {
@@ -889,17 +902,22 @@ async function handleAuthSubmit(event) {
 
   try {
     const endpoint = state.authMode === 'register' ? '/auth/register' : '/auth/login';
-    const payload = state.authMode === 'register' 
-      ? { email, password, username: username || email.split('@')[0] } 
+    const payload = state.authMode === 'register'
+      ? { email, password, username }
       : { email, password };
 
     const data = await apiFetch(endpoint, {
       method: 'POST',
+      headers: {
+        'Accept': 'application/json'
+      },
       body: JSON.stringify(payload)
     });
 
     // Handle token format: could be { token: "..." } or { data: { token: "...", user: {...} } }
-    const token = data.token || (data.data && data.data.token) || (data.user && data.user.token);
+    const token = data.token || data.access_token ||
+      (data.data && (data.data.token || data.data.access_token)) ||
+      (data.user && data.user.token);
     const user = data.user || (data.data && data.data.user) || { email, username: username || email };
 
     if (token) {
@@ -910,9 +928,11 @@ async function handleAuthSubmit(event) {
       showToast(`Berhasil masuk sebagai ${user.username || user.email}! 👋`, 'success');
       closeAuthModal();
       renderAuthUI();
+
       loadWatchlist();
       loadWatchedList();
       applyMovieFilters();
+
     } else {
       showToast('Registrasi berhasil! Silakan login.', 'success');
       setAuthMode('login');
