@@ -1,85 +1,263 @@
-# FilmLog — GDGoC Backend Recruitment Task Starter Pack
+# FilmLog 🎬
 
-Selamat datang di repositori penugasan backend **FilmLog (Movie Watchlist & Review Platform)**. Repositori ini menyediakan:
-1. **Initial Seed Database** (`data/movies.json` dan `data/seed.sql`) berisi 20 film kurasi awal dengan atribut lengkap.
-2. **Frontend Companion** (`frontend/`) bertema Letterboxd yang siap pakai untuk menguji endpoint backend Anda secara visual dan interaktif.
+A movie watchlist and review platform inspired by Letterboxd. FilmLog allows users to discover movies, manage their watchlists, track watched movies, write reviews, and receive AI-powered movie recommendations based on their preferences.
 
----
+## Features
 
-## 🎯 Objektif Penugasan
-Rancang dan bangun layanan **RESTful API** untuk aplikasi pelacak film (*movie watchlist*) yang mendukung alur autentikasi, kurasi film, pencatatan tontonan dan ulasan, serta integrasi **Google Gemini LLM** untuk rekomendasi film berbasis data lokal.
+- **User Authentication** — Register, log in, and log out using JWT authentication.
+- **Movie Discovery** — Browse the available movie catalogue and view individual movie details.
+- **Watchlist Management** — Add movies to or remove movies from your personal watchlist.
+- **Watched Movies** — Mark movies as watched and keep track of your viewing history.
+- **Ratings and Reviews** — Rate watched movies and write personal reviews.
+- **AI Movie Recommendations** — Get personalized recommendations using Google's Gemini API, grounded in the movie catalogue stored in the database.
 
-Bebas menggunakan bahasa pemrograman dan framework apa pun (Node.js/Express/NestJS, Go/Gin/Fiber, Python/FastAPI/Django, PHP/Laravel, Java/Spring Boot, dll.) serta database relasional (PostgreSQL, MySQL, SQLite) atau NoSQL.
+## Tech Stack
 
----
+| Component | Technology |
+|---|---|
+| Backend | PHP, Laravel 12 |
+| Frontend | HTML, CSS, Vanilla JavaScript |
+| Database | SQLite |
+| Authentication | JWT (Laravel JWT Auth) |
+| AI Integration | Google Gemini API |
+| Development Tools | VS Code, Composer, Git |
 
-## 📁 Struktur Repositori Starter
+## Project Structure
 
 ```text
 movie-watchlist-starter/
-├── data/
-│   ├── movies.json     # Data 20 film awal (format JSON) untuk database seeder
-│   └── seed.sql        # Skrip SQL INSERT kompatibel dengan PostgreSQL & MySQL
+├── backend/
+│   ├── app/
+│   │   ├── Http/Controllers/Api/
+│   │   └── Models/
+│   ├── config/
+│   ├── database/
+│   │   ├── migrations/
+│   │   ├── seeders/
+│   │   └── database.sqlite
+│   ├── routes/
+│   │   └── api.php
+│   ├── .env.example
+│   └── ...
+│
 ├── frontend/
-│   ├── index.html      # Frontend Letterboxd-style SPA (Zero-build Tailwind)
-│   ├── app.js          # Client logic & API caller
-│   └── README.md       # Panduan menjalankan frontend
-└── README.md           # Panduan penugasan & spesifikasi API
+│   ├── app.js
+│   ├── index.html
+│   └── ...
+│
+└── README.md
 ```
 
+## Getting Started
+
+### Prerequisites
+
+Make sure you have installed:
+
+- PHP 8.2 or newer
+- Composer
+- SQLite
+- Node.js (only if needed for optional frontend tooling)
+- Visual Studio Code with the Live Server extension
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/altschrei/filmlog.git
+cd filmlog
+```
+
+### 2. Set Up the Backend
+
+Navigate to the backend directory:
+
+```bash
+cd backend
+```
+
+Install PHP dependencies:
+
+```bash
+composer install
+```
+
+Create your environment configuration:
+
+```bash
+cp .env.example .env
+```
+
+On Windows PowerShell, you can use:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Generate the Laravel application key:
+
+```bash
+php artisan key:generate
+```
+
+Create the SQLite database file if it does not already exist:
+
+```powershell
+New-Item -ItemType File -Path database/database.sqlite -Force
+```
+
+Configure the database in your `.env` file:
+
+```env
+DB_CONNECTION=sqlite
+```
+
+Configure JWT authentication:
+
+```bash
+php artisan jwt:secret
+```
+
+Run database migrations and seed the movie catalogue:
+
+```bash
+php artisan migrate --seed
+```
+
+If your project uses a separate movie seeder, run that seeder according to its class name.
+
+### 3. Configure Gemini API
+
+FilmLog uses Google's Gemini API to generate personalized movie recommendations.
+
+Obtain an API key from [Google AI Studio](https://aistudio.google.com/).
+
+Add the following configuration to your backend `.env` file:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+Keep your API key private. Do not commit your `.env` file or expose the key in frontend JavaScript.
+
+The backend reads the API key from the environment and makes requests to Gemini. Movie recommendations are grounded in the existing movie catalogue rather than generated from an unrestricted list of movie titles.
+
+### 4. Start the Backend Server
+
+From the `backend` directory:
+
+```bash
+php artisan serve
+```
+
+The backend should be available at:
+
+```text
+http://127.0.0.1:8000
+```
+
+### 5. Start the Frontend
+
+Open the `frontend` directory in Visual Studio Code.
+
+Right-click `index.html` and select **Open with Live Server**.
+
+The frontend will open in your browser. It communicates with the Laravel backend running locally.
+
+## API Endpoints
+
+All API endpoints use the `/api` prefix.
+
+### Authentication
+
+| Method | Endpoint | Description | Authentication |
+|---|---|---|---|
+| POST | `/api/auth/register` | Register a new user | No |
+| POST | `/api/auth/login` | Log in | No |
+| POST | `/api/auth/logout` | Log out | Yes |
+
+### Movies
+
+| Method | Endpoint | Description | Authentication |
+|---|---|---|---|
+| GET | `/api/movies` | Retrieve the movie catalogue | No |
+| GET | `/api/movies/{id}` | Retrieve movie details | No |
+| POST | `/api/movies/recommend` | Generate AI movie recommendations | Yes |
+
+### Watchlist
+
+| Method | Endpoint | Description | Authentication |
+|---|---|---|---|
+| GET | `/api/watchlist` | Retrieve the user's watchlist | Yes |
+| POST | `/api/watchlist` | Add a movie to the watchlist | Yes |
+| DELETE | `/api/watchlist/{movieId}` | Remove a movie from the watchlist | Yes |
+
+### Watched Movies
+
+| Method | Endpoint | Description | Authentication |
+|---|---|---|---|
+| GET | `/api/watched` | Retrieve watched movies | Yes |
+| POST | `/api/watched` | Mark a movie as watched and submit a rating or review | Yes |
+
+Protected endpoints require a valid JWT authentication token.
+
+## AI Recommendation System
+
+FilmLog integrates Google's Gemini API to provide personalized movie recommendations.
+
+The recommendation process works as follows:
+
+1. The user submits their movie preferences through the frontend.
+2. The frontend sends the preferences to the Laravel backend.
+3. The backend retrieves the available movies from the local database.
+4. The backend sends the movie catalogue and user preferences to Gemini.
+5. Gemini selects suitable movies from the provided catalogue and returns movie IDs with explanations.
+6. The backend validates the returned IDs against the database.
+7. The frontend displays the recommended movies and their explanations.
+
+This approach grounds the AI's recommendations in the application's actual movie data and helps prevent recommendations for movies that do not exist in the catalogue.
+
+**Note:** AI recommendations require a valid Gemini API key and are subject to the API provider's usage limits and availability.
+
+## Database
+
+FilmLog uses SQLite for data storage.
+
+The main data entities include:
+
+- **Users** — Stores registered user accounts.
+- **Movies** — Stores movie information, including titles, descriptions, release years, genres, directors, and poster URLs.
+- **Watcheds** — Stores user-specific watched movie records, including ratings and reviews.
+- **Watchlist** — Stores the relationship between users and movies they want to watch.
+
+User-related movie records are associated with their respective users, allowing each user to maintain an independent watchlist and viewing history.
+
+## Security and Error Handling
+
+FilmLog implements several backend security practices:
+
+- JWT authentication for protected API endpoints.
+- Server-side validation of incoming requests.
+- Authentication middleware to restrict access to user-specific resources.
+- Environment variables for sensitive configuration, including the Gemini API key.
+- Backend validation of AI-generated movie IDs against the database.
+
+## Future Improvements
+
+Potential improvements include:
+
+- Automated backend and API tests.
+- More advanced movie filtering and search.
+- Improved recommendation personalization based on viewing history.
+- Deployment to a production hosting environment.
+- More comprehensive error handling and API documentation.
+
+## Author
+
+**Raihan Aframadhan**
+
+GitHub: [@altschrei](https://github.com/altschrei)
+
 ---
 
-## 📑 Spesifikasi Kontrak API (API Contract)
-
-Agar sistem dapat terhubung secara lancar dengan frontend companion yang disediakan, pastikan API Anda mematuhi spesifikasi antarmuka (API Contract) berikut:
-
-### 1. Autentikasi
-* `POST /api/auth/register`
-  * **Body:** `{ "username": "string", "email": "string", "password": "string" }`
-  * **Response:** Status `201 Created`
-* `POST /api/auth/login`
-  * **Body:** `{ "email": "string", "password": "string" }`
-  * **Response:** Status `200 OK`, JSON berisi `{ "token": "JWT_STRING", "user": { ... } }`
-
-### 2. Movies
-* `GET /api/movies`
-  * **Query Params (Opsional):** `?genre=Sci-Fi&search=Inception`
-  * **Response:** Status `200 OK`, array daftar film dari database.
-* `GET /api/movies/:id`
-  * **Response:** Status `200 OK`, detail lengkap satu film.
-
-### 3. Watchlist (Protected - Membutuhkan `Authorization: Bearer <token>`)
-* `GET /api/watchlist`
-  * **Response:** Status `200 OK`, daftar film di watchlist user yang sedang login.
-* `POST /api/watchlist`
-  * **Body:** `{ "movieId": 1 }`
-  * **Response:** Status `201 Created`
-* `DELETE /api/watchlist/:movieId`
-  * **Response:** Status `200 OK` (atau `204 No Content`)
-
-### 4. Watched & Review (Protected - Membutuhkan `Authorization: Bearer <token>`)
-* `GET /api/watched`
-  * **Response:** Status `200 OK`, riwayat film yang sudah ditonton oleh user beserta ulasan dan ratingnya.
-* `POST /api/watched`
-  * **Body:** `{ "movieId": 1, "rating": 5, "review": "Filmnya luar biasa..." }`
-  * **Response:** Status `201 Created`.
-
-### 5. AI Recommendation (Gemini API Integration ⭐)
-* `POST /api/movies/recommend`
-  * **Body:** `{ "prompt": "Saya mau film misteri dengan alur lambat dan atmosfer mendalam" }`
-  * **Aturan Khusus:** Film yang direkomendasikan **harus berasal dari 20 film di database awal**.
-  * **Response:** Status `200 OK` dengan JSON terstruktur:
-    ```json
-    {
-      "movie_id": 14,
-      "reasoning": "Memento sangat cocok dengan preferensi misteri Anda karena..."
-    }
-    ```
-
----
-
-## 💡 Prinsip Backend yang Dinilai
-1. **Database Modeling:** Relasi yang rapi antar tabel (`users`, `movies`, `watchlists`, `reviews`).
-2. **Access Control & Security:** Password di-hash (bcrypt/argon2), rute privat terlindungi token JWT, user tidak dapat memodifikasi data user lain.
-3. **Data Integrity & Robustness:** Validasi input request, penanganan error yang baik, dan penggunaan status code HTTP yang semantik.
-4. **Structured LLM Prompting:** Kemampuan mengarahkan Gemini untuk memilih dari subset data lokal dan mengembalikan JSON terstruktur.
+*FilmLog — Discover, track, and review the movies you love.*
