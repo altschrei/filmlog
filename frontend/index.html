@@ -251,11 +251,20 @@
         </div>
 
         <div class="flex items-center justify-between pt-2 border-t border-brand-border">
-          <span class="text-xs text-brand-muted">Endpoint: <code class="text-brand-green">POST /api/recommendations</code></span>
-          <button id="btn-submit-ai" onclick="submitAiRecommendation()" class="px-5 py-2.5 bg-brand-green text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition flex items-center gap-2 shadow-lg shadow-brand-green/20">
-            <i data-lucide="sparkles" class="w-4 h-4"></i> Ask AI
+          <span class="text-xs text-brand-muted">
+              Endpoint: <code class="text-brand-green">POST /api/movies/recommend</code>
+          </span>
+
+          <button
+              type="button"
+              id="btn-submit-ai"
+              onclick="submitAiRecommendation()"
+              class="px-5 py-2.5 bg-brand-green text-black font-bold text-sm rounded-xl hover:brightness-110 active:scale-95 transition flex items-center gap-2 shadow-lg shadow-brand-green/20"
+          >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              Ask AI
           </button>
-        </div>
+      </div>
       </div>
 
       <!-- AI Recommendation Result Card -->

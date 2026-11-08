@@ -217,25 +217,20 @@ async function loadDiscoverMovies(shuffle = false) {
     statusEl.classList.add('hidden');
     document.getElementById('api-status-dot').className = 'w-2 h-2 rounded-full bg-emerald-400';
   } catch (err) {
-    statusEl.classList.add('hidden');
-    document.getElementById('api-status-dot').className = 'w-2 h-2 rounded-full bg-rose-500';
+      console.error('AI Recommendation Error:', err);
 
-    // Fallback: If backend is not running, load local static seed so applicant can see UI layout
-    console.warn('Backend not reachable, loading fallback local seed:', err.message);
-    try {
-      const fallbackRes = await fetch('../data/movies.json');
-      state.allMovies = await fallbackRes.json();
-      if (shuffle) state.allMovies.sort(() => Math.random() - 0.5);
-      applyMovieFilters();
-      showToast('⚠️ Backend belum aktif. Menampilkan data lokal (fallback). Pastikan server backend Anda berjalan di ' + state.apiBaseUrl, 'warning');
-    } catch (fallbackErr) {
-      gridEl.innerHTML = `
-        <div class="col-span-full py-12 text-center text-rose-400 bg-rose-950/20 border border-rose-900/40 rounded-xl p-6">
-          <p class="font-bold mb-1">Gagal terhubung ke backend (${state.apiBaseUrl})</p>
-          <p class="text-xs text-brand-muted">Pastikan server backend Anda menyala dan mengizinkan CORS.</p>
-        </div>
-      `;
-    }
+      resultContainer.replaceChildren();
+
+      const errorBox = document.createElement('div');
+      errorBox.className =
+          'p-4 rounded-xl border border-rose-500/30 bg-rose-950/30 text-rose-300';
+
+      errorBox.textContent = `AI Recommendation Error: ${err.message}`;
+
+      resultContainer.appendChild(errorBox);
+      resultContainer.classList.remove('hidden');
+
+      showToast(`AI Recommendation Error: ${err.message}`, 'error');
   }
 }
 
@@ -745,10 +740,39 @@ async function submitAiRecommendation() {
     renderAiRecommendation(response);
     resultContainer.classList.remove('hidden');
 
-    showToast('Gemini berhasil menemukan film yang cocok!', 'success');
+    if (response.fallback === true) {
+      showToast(response.message || 'AI recommendations are temporarily unavailable. Showing random picks instead.', 'warning');
+    } else {
+      showToast('Gemini berhasil menemukan film yang cocok!', 'success');
+    }
   } catch (err) {
-    console.error('AI Recommendation Error:', err);
-    showToast(`AI Recommendation Error: ${err.message}`, 'error');
+      console.error('AI Recommendation Error:', err);
+
+      let message = err.message;
+
+      if (message.includes('429')) {
+          message = 'Gemini API quota exceeded. Please try again after your quota resets.';
+      } else if (message.includes('503')) {
+          message = 'Gemini is currently experiencing high demand. Please try again later.';
+      } else if (
+          message.toLowerCase().includes('timeout') ||
+          message.toLowerCase().includes('connection')
+      ) {
+          message = 'Could not connect to Gemini. Please check your connection and try again.';
+      }
+
+      resultContainer.replaceChildren();
+
+      const errorBox = document.createElement('div');
+      errorBox.className =
+          'p-4 rounded-xl border border-rose-500/30 bg-rose-950/30 text-rose-300';
+
+      errorBox.textContent = message;
+
+      resultContainer.appendChild(errorBox);
+      resultContainer.classList.remove('hidden');
+
+      showToast(message, 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = `
@@ -773,6 +797,7 @@ function renderAiRecommendation(data) {
   })[char]);
 
   const recommendations = data.recommendations || [];
+  const isFallback = data.fallback === true;
 
   if (!recommendations.length) {
     container.innerHTML = `
@@ -784,10 +809,18 @@ function renderAiRecommendation(data) {
   }
 
   container.innerHTML = `
+    ${isFallback ? `
+      <div class="mb-5 p-4 rounded-xl border border-amber-500/30 bg-amber-950/30 text-amber-300">
+        ${escapeHtml(data.message || 'AI recommendations are temporarily unavailable. Showing random picks instead.')}
+      </div>
+    ` : ''}
+
     <div class="mb-5">
-      <h3 class="text-xl font-bold">Your AI Recommendations</h3>
+      <h3 class="text-xl font-bold">${isFallback ? 'Random Movie Picks' : 'Your AI Recommendations'}</h3>
       <p class="text-sm text-brand-muted mt-1">
-        ${recommendations.length} movies selected based on your preferences
+        ${isFallback
+          ? `${recommendations.length} movies selected at random`
+          : `${recommendations.length} movies selected based on your preferences`}
       </p>
     </div>
 

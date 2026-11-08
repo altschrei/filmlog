@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
-use Throwable;
 
 class RecommendationController extends Controller
 {
@@ -22,9 +21,9 @@ class RecommendationController extends Controller
         $model = config('services.gemini.model');
 
         if (!$apiKey) {
-            return response()->json([
-                'message' => 'Gemini API key is not configured.',
-            ], 503);
+            Log::warning('Gemini API key is not configured. Using fallback recommendations.');
+
+            return $this->fallbackRecommendations();
         }
 
         // Retrieve the available FilmLog catalogue.
@@ -65,31 +64,31 @@ class RecommendationController extends Controller
         })->values()->all();
 
         $prompt = "
-You are a movie recommendation assistant for FilmLog.
+            You are a movie recommendation assistant for FilmLog.
 
-Recommend up to 5 movies from the catalogue below.
+            Recommend up to 5 movies from the catalogue below.
 
-User preferences:
-{$validated['preferences']}
+            User preferences:
+            {$validated['preferences']}
 
-Available movie catalogue:
-" . json_encode($catalogue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "
+            Available movie catalogue:
+            " . json_encode($catalogue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "
 
-Rules:
-- Only recommend movies whose IDs exist in the supplied catalogue.
-- Never invent movies or movie IDs.
-- Do not recommend the same movie more than once.
-- Give a short, relevant explanation for each recommendation.
-- Return only valid JSON in this exact structure:
-{
-    \"recommendations\": [
-        {
-            \"movie_id\": 1,
-            \"reason\": \"A short explanation.\"
-        }
-    ]
-}
-";
+            Rules:
+            - Only recommend movies whose IDs exist in the supplied catalogue.
+            - Never invent movies or movie IDs.
+            - Do not recommend the same movie more than once.
+            - Give a short, relevant explanation for each recommendation.
+            - Return only valid JSON in this exact structure:
+            {
+                \"recommendations\": [
+                    {
+                        \"movie_id\": 1,
+                        \"reason\": \"A short explanation.\"
+                    }
+                ]
+            }
+            ";
 
         try {
             $response = Http::connectTimeout(10)
@@ -119,9 +118,7 @@ Rules:
                 'exception' => get_class($e),
             ]);
 
-            return response()->json([
-                'message' => 'Could not connect to the recommendation service.',
-            ], 502);
+            return $this->fallbackRecommendations();
         }
 
         if ($response->failed()) {
@@ -130,9 +127,7 @@ Rules:
                 'body' => $response->json(),
             ]);
 
-            return response()->json([
-                'message' => 'The recommendation service returned an error.',
-            ], 502);
+            return $this->fallbackRecommendations();
         }
 
         $generatedText = data_get(
@@ -141,18 +136,18 @@ Rules:
         );
 
         if (!is_string($generatedText)) {
-            return response()->json([
-                'message' => 'The recommendation service returned an invalid response.',
-            ], 502);
+            Log::warning('Gemini returned an invalid recommendation response.');
+
+            return $this->fallbackRecommendations();
         }
 
         $result = json_decode($generatedText, true);
 
         if (!is_array($result) || !isset($result['recommendations'])
             || !is_array($result['recommendations'])) {
-            return response()->json([
-                'message' => 'Could not process the generated recommendations.',
-            ], 502);
+            Log::warning('Gemini returned unparseable recommendations.');
+
+            return $this->fallbackRecommendations();
         }
 
         // Only accept IDs from our actual database catalogue.
@@ -161,6 +156,10 @@ Rules:
         $recommendations = [];
 
         foreach ($result['recommendations'] as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
             $movieId = filter_var(
                 $item['movie_id'] ?? null,
                 FILTER_VALIDATE_INT
@@ -191,13 +190,37 @@ Rules:
         }
 
         if (empty($recommendations)) {
-            return response()->json([
-                'message' => 'No valid recommendations could be generated. Please try again.',
-            ], 502);
+            Log::warning('Gemini returned no valid movie recommendations.');
+
+            return $this->fallbackRecommendations();
         }
 
         return response()->json([
             'recommendations' => $recommendations,
+        ]);
+    }
+    private function fallbackRecommendations()
+    {
+        $recommendations = Movie::inRandomOrder()
+            ->limit(5)
+            ->get()
+            ->map(function ($movie) {
+                return [
+                    'movie' => $movie,
+                    'reason' => 'A random pick from our movie collection.',
+                ];
+            });
+
+        if ($recommendations->isEmpty()) {
+            return response()->json([
+                'message' => 'No movies are available.',
+            ], 404);
+        }
+
+        return response()->json([
+            'recommendations' => $recommendations,
+            'fallback' => true,
+            'message' => 'AI is temporarily unavailable. Showing random picks instead.',
         ]);
     }
 }
