@@ -719,6 +719,7 @@ function setAiPrompt(text) {
 async function submitAiRecommendation() {
   const promptInput = document.getElementById('ai-prompt-input');
   const prompt = promptInput.value.trim();
+
   if (!prompt) {
     showToast('Tuliskan deskripsi atau suasana film yang ingin kamu cari', 'warning');
     return;
@@ -728,24 +729,33 @@ async function submitAiRecommendation() {
   const resultContainer = document.getElementById('ai-result-container');
 
   btn.disabled = true;
-  btn.innerHTML = `<div class="animate-spin w-4 h-4 border-2 border-black border-t-transparent rounded-full"></div> Analyzing...`;
+  btn.innerHTML = `
+    <div class="animate-spin w-4 h-4 border-2 border-black border-t-transparent rounded-full"></div>
+    Analyzing...
+  `;
 
   try {
-    // POST /api/movies/recommend
     const response = await apiFetch('/movies/recommend', {
       method: 'POST',
-      body: JSON.stringify({ prompt: prompt, query: prompt, description: prompt })
+      body: JSON.stringify({
+        preferences: prompt
+      })
     });
 
-    const resultData = response.data || response;
-    renderAiRecommendation(resultData);
+    renderAiRecommendation(response);
     resultContainer.classList.remove('hidden');
-    showToast('Gemini berhasil menemukan film yang cocok! ✨', 'success');
+
+    showToast('Gemini berhasil menemukan film yang cocok!', 'success');
   } catch (err) {
+    console.error('AI Recommendation Error:', err);
     showToast(`AI Recommendation Error: ${err.message}`, 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Ask AI`;
+    btn.innerHTML = `
+      <i data-lucide="sparkles" class="w-4 h-4"></i>
+      Ask AI
+    `;
+
     lucide.createIcons();
   }
 }
@@ -753,66 +763,107 @@ async function submitAiRecommendation() {
 function renderAiRecommendation(data) {
   const container = document.getElementById('ai-result-container');
 
-  // Backend might return { movie_id: 1, reasoning: "..." } or full { movie: {...}, reasoning: "..." }
-  const movieId = data.movie_id || data.movieId || (data.movie && data.movie.id);
-  const matchedMovie = data.movie || state.allMovies.find(m => String(m.id) === String(movieId)) || {
-    id: movieId || 1,
-    title: data.title || 'Recommended Film',
-    year: data.year || '',
-    genres: data.genres || ['Recommended'],
-    rating: data.rating || 8.5,
-    synopsis: data.synopsis || '',
-    poster_url: data.poster_url || 'https://via.placeholder.com/300x450'
-  };
+  // Escape text before inserting it into HTML.
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[char]);
 
-  const reasoning = data.reasoning || data.explanation || data.message || 'Film ini dipilih berdasarkan kecocokan tema, plot, dan atmosfer yang Anda minta.';
-  const poster = matchedMovie.poster_url || 'https://via.placeholder.com/300x450';
+  const recommendations = data.recommendations || [];
+
+  if (!recommendations.length) {
+    container.innerHTML = `
+      <p class="text-center text-brand-muted py-8">
+        Gemini couldn't find any matching movies. Try describing your preferences differently.
+      </p>
+    `;
+    return;
+  }
 
   container.innerHTML = `
-    <div class="bg-gradient-to-br from-brand-surface via-brand-card to-brand-surface p-6 sm:p-8 rounded-2xl border-2 border-brand-green/40 shadow-2xl relative overflow-hidden">
-      <div class="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-        <i data-lucide="sparkles" class="w-32 h-32 text-brand-green"></i>
-      </div>
+    <div class="mb-5">
+      <h3 class="text-xl font-bold">Your AI Recommendations</h3>
+      <p class="text-sm text-brand-muted mt-1">
+        ${recommendations.length} movies selected based on your preferences
+      </p>
+    </div>
 
-      <div class="relative z-10">
-        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-green/20 text-brand-green text-xs font-bold mb-4 border border-brand-green/40">
-          ✨ Rekomendasi Terpilih dari Database Anda
-        </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      ${recommendations.map(item => {
+        const movie = item.movie;
 
-        <div class="flex flex-col sm:flex-row gap-6 items-start">
-          <img src="${poster}" alt="${matchedMovie.title}" class="w-36 sm:w-44 aspect-[2/3] object-cover rounded-xl border border-brand-border shadow-xl shrink-0" />
-          
-          <div class="flex-1 space-y-3">
-            <div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-amber-400">★ ${matchedMovie.rating || 'N/A'}</span>
-                <span class="text-xs text-brand-muted">• ${matchedMovie.year || ''}</span>
-              </div>
-              <h3 class="text-2xl font-black text-white hover:text-brand-green cursor-pointer" onclick="openMovieDetail(${matchedMovie.id})">${matchedMovie.title}</h3>
-              <p class="text-xs text-brand-muted">Directed by ${matchedMovie.director || 'Unknown'}</p>
-            </div>
+        if (!movie || !movie.id) return '';
 
-            <!-- Gemini Reasoning Card -->
-            <div class="bg-brand-dark/70 border border-brand-border/60 rounded-xl p-4 space-y-1.5">
-              <span class="text-xs font-bold text-brand-green flex items-center gap-1.5">
-                <i data-lucide="bot" class="w-3.5 h-3.5"></i> Alasan Rekomendasi (Gemini Analysis):
-              </span>
-              <p class="text-xs text-gray-200 leading-relaxed italic">
-                "${reasoning}"
+        const movieId = Number(movie.id);
+        const title = escapeHtml(movie.title || 'Untitled Movie');
+        const year = escapeHtml(movie.year || 'Year unknown');
+        const director = escapeHtml(movie.director || 'Unknown director');
+        const reason = escapeHtml(
+          item.reason || 'Recommended based on your preferences.'
+        );
+
+        const genres = Array.isArray(movie.genres)
+          ? movie.genres.join(', ')
+          : (movie.genres || movie.genre || 'Uncategorized');
+
+        const posterUrl = /^https?:\/\//i.test(movie.poster_url || '')
+          ? escapeHtml(movie.poster_url)
+          : 'https://via.placeholder.com/300x450';
+
+        const rating = movie.rating
+          ? Number(movie.rating).toFixed(1)
+          : 'N/A';
+
+        return `
+          <div class="flex gap-4 p-4 rounded-xl border border-brand-border bg-brand-card">
+            <img
+              src="${posterUrl}"
+              alt="${title}"
+              class="w-28 h-40 object-cover rounded-lg flex-shrink-0"
+              onerror="this.src='https://via.placeholder.com/300x450'"
+            />
+
+            <div class="flex flex-col flex-1 min-w-0">
+              <h4 class="font-bold text-base">${title}</h4>
+
+              <p class="text-xs text-brand-muted mt-1">
+                ${year} · ${director}
               </p>
-            </div>
 
-            <div class="pt-2 flex items-center gap-3">
-              <button onclick="openMovieDetail(${matchedMovie.id})" class="px-4 py-2 bg-brand-surfaceHover border border-brand-border hover:border-brand-green text-xs font-semibold text-white rounded-xl transition">
-                Lihat Detail Lengkap
-              </button>
-              <button onclick="toggleWatchlist(${matchedMovie.id})" class="px-4 py-2 bg-brand-green text-black text-xs font-bold rounded-xl hover:brightness-110 transition flex items-center gap-1.5">
-                <i data-lucide="bookmark" class="w-3.5 h-3.5"></i> Masukkan ke Watchlist
-              </button>
+              <p class="text-xs text-brand-muted mt-1">
+                ${escapeHtml(genres)}
+              </p>
+
+              <p class="text-sm mt-2">
+                ⭐ ${rating}
+              </p>
+
+              <p class="text-sm text-brand-muted mt-3">
+                ${reason}
+              </p>
+
+              <div class="flex flex-wrap gap-2 mt-auto pt-4">
+                <button
+                  onclick="openMovieDetail(${movieId})"
+                  class="text-xs px-3 py-2 rounded-lg bg-brand-primary text-white"
+                >
+                  View Details
+                </button>
+
+                <button
+                  onclick="toggleWatchlist(${movieId})"
+                  class="text-xs px-3 py-2 rounded-lg border border-brand-border"
+                >
+                  Watchlist
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        `;
+      }).join('')}
     </div>
   `;
 
